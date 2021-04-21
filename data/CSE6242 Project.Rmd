@@ -1,0 +1,192 @@
+---
+title: "CSE6242_Project"
+author: "Kierra Shay"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+covid19_df <- read.csv("C:/Users/Kierra/OneDrive/CSE 6242 - Data & Visual Analytics/Joined Datasets/US_Counties_Covid_withDemographics.csv", stringsAsFactors = FALSE)
+```
+```{r}
+mask_df <- read.csv("C:/Users/Kierra/OneDrive/CSE 6242 - Data & Visual Analytics/Joined Datasets/mask-use-by-county_ana.csv")
+```
+
+```{r}
+library(tidyverse)
+library(gghighlight)
+covid19_df_filtered <- covid19_df %>% filter(POPULATION > 0)
+covid19_df_filtered$covid_per_10k <- (covid19_df_filtered$cases/covid19_df_filtered$POPULATION)*10000
+covid_clusters <- covid19_df_filtered %>%
+  select(covid_per_10k, date, fips) %>%
+  drop_na() %>%
+  glimpse()
+```
+```{r}
+spread_covid_per_10k <- covid_clusters %>%
+  spread(fips,covid_per_10k)
+```
+
+
+```{r}
+cases <- t(spread_covid_per_10k[-1])
+cases_dist <- dist(cases, method = "euclidean")
+fit <- hclust(cases_dist,method = "ward.D")
+```
+
+
+```{r}
+plot(fit)
+rect.hclust(fit, k=20, border = "cadetblue")
+```
+```{r}
+library(tidyverse)  # data manipulation
+library(cluster)    # clustering algorithms
+library(factoextra) # clustering visualization
+library(dendextend) # for comparing two dendrograms
+fviz_nbclust(cases, FUN = hcut, method = "wss")
+```
+
+
+
+```{r}
+clustered_data <- cutree(fit, k=5)
+clustered_data_tidy <- as.data.frame(as.table(clustered_data)) 
+colnames(clustered_data_tidy) <- c("fips","cluster")
+clustered_data_tidy$fips <- as.character(clustered_data_tidy$fips)
+covid19_df_filtered$fips <- as.character(covid19_df_filtered$fips)
+
+joined_clusters <- covid19_df_filtered %>%
+  inner_join(clustered_data_tidy, by = "fips")
+
+table(clustered_data_tidy$cluster)
+```
+
+```{r}
+cluster1 <- joined_clusters %>% filter(cluster == 1)
+cluster2 <- joined_clusters %>% filter(cluster == 2)
+cluster3 <- joined_clusters %>% filter(cluster == 3)
+cluster4 <- joined_clusters %>% filter(cluster == 4)
+cluster5 <- joined_clusters %>% filter(cluster == 5)
+```
+```{r}
+write.csv(joined_clusters,"covid_clusters.csv", row.names = TRUE)
+```
+
+```{r}
+library("dplyr")
+colnames(mask_df)[which(names(mask_df) == "ï..COUNTYFP")] = "fips"
+mask_df$fips <- as.character(mask_df$fips)
+mask_county=joined_clusters %>% inner_join(mask_df, by="fips")
+mask_county$mask_ratio=mask_county$ALWAYS+mask_county$FREQUENTLY
+names(mask_county)
+model_1=lm(mask_ratio~MED_AGE, data = mask_county)
+summary(model_1)
+mask_county$TOTAL_AGE_GROUP=mask_county$AGE_UNDER5+mask_county$AGE_5_9+mask_county$AGE_10_14+mask_county$AGE_15_19+mask_county$AGE_20_24+mask_county$AGE_25_34+mask_county$AGE_35_44+mask_county$AGE_45_54+mask_county$AGE_55_64+mask_county$AGE_65_74+mask_county$AGE_75_84+mask_county$AGE_85_UP
+
+mask_county$PCT_UNDER5=mask_county$AGE_UNDER5/mask_county$TOTAL_AGE_GROUP
+mask_county$PCT_5_9=mask_county$AGE_5_9/mask_county$TOTAL_AGE_GROUP
+mask_county$PCT_10_14=mask_county$AGE_10_14/mask_county$TOTAL_AGE_GROUP
+mask_county$PCT_15_19=mask_county$AGE_15_19/mask_county$TOTAL_AGE_GROUP
+mask_county$PCT_20_24=mask_county$AGE_20_24/mask_county$TOTAL_AGE_GROUP
+mask_county$PCT_25_34=mask_county$AGE_25_34/mask_county$TOTAL_AGE_GROUP
+mask_county$PCT_35_44=mask_county$AGE_35_44/mask_county$TOTAL_AGE_GROUP
+mask_county$PCT_45_54=mask_county$AGE_45_54/mask_county$TOTAL_AGE_GROUP
+mask_county$PCT_55_64=mask_county$AGE_55_64/mask_county$TOTAL_AGE_GROUP
+mask_county$PCT_65_74=mask_county$AGE_65_74/mask_county$TOTAL_AGE_GROUP
+mask_county$PCT_75_84=mask_county$AGE_75_84/mask_county$TOTAL_AGE_GROUP
+mask_county$PCT_85_UP=mask_county$AGE_85_UP/mask_county$TOTAL_AGE_GROUP
+
+ML_model=lm(mask_ratio~PCT_UNDER5+PCT_5_9+PCT_10_14+PCT_15_19+PCT_20_24+PCT_25_34+PCT_35_44+PCT_45_54+PCT_55_64+PCT_65_74+PCT_75_84+PCT_85_UP, data = mask_county)
+summary(ML_model)
+```
+```{r}
+joined_clusters_filtered <- joined_clusters %>% filter(date == "3/29/2021")
+cluster1_filtered <- joined_clusters_filtered %>% filter(cluster == 1)
+cluster2_filtered <- joined_clusters_filtered %>% filter(cluster == 2)
+cluster3_filtered <- joined_clusters_filtered %>% filter(cluster == 3)
+cluster4_filtered <- joined_clusters_filtered %>% filter(cluster == 4)
+cluster5_filtered <- joined_clusters_filtered %>% filter(cluster == 5)
+```
+
+
+```{r}
+cluster1_filtered <- cluster1_filtered %>% select(POPULATION,	POP_SQMI,	POP2010,	POP10_SQMI,	WHITE,	BLACK,	AMERI_ES,	ASIAN,	HAWN_PI,	HISPANIC,	OTHER,	MULT_RACE,	MALES,	FEMALES,	AGE_UNDER5,	AGE_5_9,	AGE_10_14,	AGE_15_19,	AGE_20_24,	AGE_25_34,	AGE_35_44,	AGE_45_54,	AGE_55_64,	AGE_65_74,	AGE_75_84,	AGE_85_UP,	MED_AGE,	MED_AGE_M,	MED_AGE_F,	HOUSEHOLDS,	AVE_HH_SZ,	HSEHLD_1_M,	HSEHLD_1_F,	MARHH_CHD,	MARHH_NO_C,	MHH_CHILD,	FHH_CHILD,	FAMILIES,	AVE_FAM_SZ,	HSE_UNITS,	VACANT,	OWNER_OCC,	RENTER_OCC,	NO_FARMS12,	AVE_SIZE12,	CROP_ACR12,	AVE_SALE12,	SQMI,	Shape_Leng,	SHAPE_Length,	SHAPE_Area,	covid_per_10k)
+
+cluster1_model <- lm(covid_per_10k~., data = cluster1_filtered)
+summary(cluster1_model)
+```
+
+
+```{r}
+cluster2_filtered <- cluster2_filtered %>% select(POPULATION,	POP_SQMI,	POP2010,	POP10_SQMI,	WHITE,	BLACK,	AMERI_ES,	ASIAN,	HAWN_PI,	HISPANIC,	OTHER,	MULT_RACE,	MALES,	FEMALES,	AGE_UNDER5,	AGE_5_9,	AGE_10_14,	AGE_15_19,	AGE_20_24,	AGE_25_34,	AGE_35_44,	AGE_45_54,	AGE_55_64,	AGE_65_74,	AGE_75_84,	AGE_85_UP,	MED_AGE,	MED_AGE_M,	MED_AGE_F,	HOUSEHOLDS,	AVE_HH_SZ,	HSEHLD_1_M,	HSEHLD_1_F,	MARHH_CHD,	MARHH_NO_C,	MHH_CHILD,	FHH_CHILD,	FAMILIES,	AVE_FAM_SZ,	HSE_UNITS,	VACANT,	OWNER_OCC,	RENTER_OCC,	NO_FARMS12,	AVE_SIZE12,	CROP_ACR12,	AVE_SALE12,	SQMI,	Shape_Leng,	SHAPE_Length,	SHAPE_Area,	covid_per_10k)
+
+cluster2_model <- lm(covid_per_10k~., data = cluster2_filtered)
+summary(cluster2_model)
+```
+
+```{r}
+cluster3_filtered <- cluster3_filtered %>% select(POPULATION,	POP_SQMI,	POP2010,	POP10_SQMI,	WHITE,	BLACK,	AMERI_ES,	ASIAN,	HAWN_PI,	HISPANIC,	OTHER,	MULT_RACE,	MALES,	FEMALES,	AGE_UNDER5,	AGE_5_9,	AGE_10_14,	AGE_15_19,	AGE_20_24,	AGE_25_34,	AGE_35_44,	AGE_45_54,	AGE_55_64,	AGE_65_74,	AGE_75_84,	AGE_85_UP,	MED_AGE,	MED_AGE_M,	MED_AGE_F,	HOUSEHOLDS,	AVE_HH_SZ,	HSEHLD_1_M,	HSEHLD_1_F,	MARHH_CHD,	MARHH_NO_C,	MHH_CHILD,	FHH_CHILD,	FAMILIES,	AVE_FAM_SZ,	HSE_UNITS,	VACANT,	OWNER_OCC,	RENTER_OCC,	NO_FARMS12,	AVE_SIZE12,	CROP_ACR12,	AVE_SALE12,	SQMI,	Shape_Leng,	SHAPE_Length,	SHAPE_Area,	covid_per_10k)
+
+cluster3_model <- lm(covid_per_10k~., data = cluster3_filtered)
+summary(cluster3_model)
+```
+
+```{r}
+cluster4_filtered <- cluster4_filtered %>% select(POPULATION,	POP_SQMI,	POP2010,	POP10_SQMI,	WHITE,	BLACK,	AMERI_ES,	ASIAN,	HAWN_PI,	HISPANIC,	OTHER,	MULT_RACE,	MALES,	FEMALES,	AGE_UNDER5,	AGE_5_9,	AGE_10_14,	AGE_15_19,	AGE_20_24,	AGE_25_34,	AGE_35_44,	AGE_45_54,	AGE_55_64,	AGE_65_74,	AGE_75_84,	AGE_85_UP,	MED_AGE,	MED_AGE_M,	MED_AGE_F,	HOUSEHOLDS,	AVE_HH_SZ,	HSEHLD_1_M,	HSEHLD_1_F,	MARHH_CHD,	MARHH_NO_C,	MHH_CHILD,	FHH_CHILD,	FAMILIES,	AVE_FAM_SZ,	HSE_UNITS,	VACANT,	OWNER_OCC,	RENTER_OCC,	NO_FARMS12,	AVE_SIZE12,	CROP_ACR12,	AVE_SALE12,	SQMI,	Shape_Leng,	SHAPE_Length,	SHAPE_Area,	covid_per_10k)
+
+cluster4_model <- lm(covid_per_10k~., data = cluster4_filtered)
+summary(cluster4_model)
+```
+
+```{r}
+cluster5_filtered <- cluster5_filtered %>% select(POPULATION,	POP_SQMI,	POP2010,	POP10_SQMI,	WHITE,	BLACK,	AMERI_ES,	ASIAN,	HAWN_PI,	HISPANIC,	OTHER,	MULT_RACE,	MALES,	FEMALES,	AGE_UNDER5,	AGE_5_9,	AGE_10_14,	AGE_15_19,	AGE_20_24,	AGE_25_34,	AGE_35_44,	AGE_45_54,	AGE_55_64,	AGE_65_74,	AGE_75_84,	AGE_85_UP,	MED_AGE,	MED_AGE_M,	MED_AGE_F,	HOUSEHOLDS,	AVE_HH_SZ,	HSEHLD_1_M,	HSEHLD_1_F,	MARHH_CHD,	MARHH_NO_C,	MHH_CHILD,	FHH_CHILD,	FAMILIES,	AVE_FAM_SZ,	HSE_UNITS,	VACANT,	OWNER_OCC,	RENTER_OCC,	NO_FARMS12,	AVE_SIZE12,	CROP_ACR12,	AVE_SALE12,	SQMI,	Shape_Leng,	SHAPE_Length,	SHAPE_Area,	covid_per_10k)
+
+cluster5_model <- lm(covid_per_10k~., data = cluster5_filtered)
+summary(cluster5_model)
+```
+
+```{r}
+library(randomForest)
+cluster1_fit=randomForest(covid_per_10k~., data=cluster1_filtered)
+library(caret)
+#varImp(cluster1_fit)
+varImpPlot(cluster1_fit, type = 2)
+```
+```{r}
+cluster2_fit=randomForest(covid_per_10k~., data=cluster2_filtered)
+#varImp(cluster1_fit)
+varImpPlot(cluster2_fit, type = 2)
+```
+
+```{r}
+cluster3_fit=randomForest(covid_per_10k~., data=cluster3_filtered)
+#varImp(cluster1_fit)
+varImpPlot(cluster3_fit, type = 2)
+```
+
+```{r}
+cluster4_fit=randomForest(covid_per_10k~., data=cluster4_filtered)
+#varImp(cluster1_fit)
+varImpPlot(cluster4_fit, type = 2)
+```
+
+```{r}
+cluster5_fit=randomForest(covid_per_10k~., data=cluster5_filtered, scale = TRUE)
+#varImp(cluster1_fit)
+varImpPlot(cluster5_fit, type = 2, scale = TRUE)
+```
+
+
+
+
+
+
+
+
+
+
+
